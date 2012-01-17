@@ -33,6 +33,9 @@
 #include <svn_auth.h>
 #include <svn_client.h>
 
+//APR Inludes
+#include <apr_tables.h>
+
 // Other
 #include <stdlib.h>
 #include <sys/stat.h>
@@ -40,10 +43,24 @@
 using namespace node;
 using namespace v8;
 
+
+typedef struct options_t {
+   svn_opt_revision_t revision_start;
+   svn_opt_revision_t revision_end;
+   svn_depth_t depth;
+   svn_boolean_t ignore_externals;
+   svn_boolean_t force; //aka allow_unver_obstructions
+} options;
+
 class SVN : public ObjectWrap
 {
 public:
 	static Persistent<FunctionTemplate> ct;
+    static Persistent<String> revision_symbol;
+    static Persistent<String> recursive_symbol;
+    static Persistent<String> depth_symbol;
+    static Persistent<String> force_symbol;
+    static Persistent<String> externals_symbol;
 
 	SVN(const char *config);
 	static void InitModule(Handle<Object> target); // V8/Node initializer
@@ -90,6 +107,9 @@ protected:
 	// Accessors
 
 	// Inceptors
+    
+    // Helpers
+    options_t parse_options(Handle<Object> opts, apr_pool_t *pool);
 private:
 	apr_pool_t *pool;
 	svn_client_ctx_t *ctx;
