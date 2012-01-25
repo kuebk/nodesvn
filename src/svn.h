@@ -62,6 +62,12 @@ public:
     static Persistent<String> force_symbol;
     static Persistent<String> externals_symbol;
 
+    static Persistent<String> status_symbol;
+
+    static Persistent<String> description_symbol;
+    static Persistent<String> message_symbol;
+    static Persistent<String> error_symbol;
+
 	SVN(const char *config);
 	static void InitModule(Handle<Object> target); // V8/Node initializer
 	static Handle<Value> New(const Arguments &args); // 'new' construct
@@ -109,13 +115,13 @@ protected:
 	// Inceptors
     
     // Helpers
-    options_t parse_options(Handle<Object> opts, apr_pool_t *pool);
+    options_t parse_options(const Handle<Value> opt_arg, apr_pool_t *pool, bool *has_err, const char **err_msg);
 private:
 	apr_pool_t *pool;
 	svn_client_ctx_t *ctx;
 
 	const char* config; // Path to config	
-	Handle<String> error(svn_error_t *error);
+	Handle<Object> error(svn_error_t *error);
 };
 
 #endif

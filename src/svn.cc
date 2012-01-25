@@ -3,6 +3,11 @@
 #define EXCEPTION(message) \
     return ThrowException(Exception::Error(String::New(message)))
 
+#define OPTIONS_EXCEPTION(message) \
+    *has_err = true; \
+    *err_msg = message; \
+    return options; 
+
 SVN::SVN(const char *config = NULL) 
 {
 	HandleScope scope;
@@ -76,9 +81,92 @@ Handle<Value> SVN::New(const Arguments &args)
 	return args.This();
 }
 
-options_t SVN::parse_options(Handle<Object> opts, apr_pool_t *pool)
+options_t SVN::parse_options(const Handle<Value> opt_arg, apr_pool_t *pool, bool *has_err, const char **err_msg)
 {
     options_t options;
+    Local<Object> opts;
+
+    options.revision_start.kind = svn_opt_revision_unspecified;
+    options.revision_end.kind = svn_opt_revision_unspecified;
+    options.depth = svn_depth_unknown;
+    options.ignore_externals = false;
+    options.force = false;
+
+
+    if (!opt_arg->IsObject()) {
+        OPTIONS_EXCEPTION("options has to be an object");
+    }
+
+    opts = opt_arg->ToObject();
+
+    if (opts->Has(this->revision_symbol)) {
+        Local<Value> revision = opts->Get(this->revision_symbol);
+
+        if (!revision->IsNumber() || !revision->IsString()) {
+            OPTIONS_EXCEPTION("revision has to be a string or a number");
+        }
+
+        String::Utf8Value jsRevision (revision->ToString());
+
+        if (svn_opt_parse_revision(&options.revision_start, &options.revision_end, *jsRevision, pool) != 0) {
+            OPTIONS_EXCEPTION("syntax error in given revision");
+        }
+    }
+
+    if (opts->Has(this->force_symbol)) {
+        Local<Value> force = opts->Get(this->force_symbol);
+
+        if (!force->IsBoolean()) {
+            OPTIONS_EXCEPTION("force has to be a boolean");
+        }
+
+        options.force = force->BooleanValue();
+    }
+
+    if (opts->Has(this->recursive_symbol)) {
+        Local<Value> recursive = opts->Get(this->recursive_symbol);
+
+        if (!recursive->IsBoolean()) {
+            OPTIONS_EXCEPTION("recursive has to be a boolean");
+        }
+
+        if (recursive->BooleanValue()) {
+            options.depth = svn_depth_files;
+        }
+    }
+
+    if (opts->Has(this->depth_symbol)) {
+        Local<Value> depth = opts->Get(this->depth_symbol);
+
+        if (!depth->IsNumber() || !depth->IsString()) {
+            OPTIONS_EXCEPTION("depth has to be a string or a number");
+        }
+
+        //veryfication needed
+        if (depth->IsNumber()) {
+            int i_depth = (int) Local<Integer>::Cast(depth)->Int32Value();
+            options.depth = static_cast<svn_depth_t>(i_depth);
+        }
+
+        if (depth->IsString()) {
+            String::Utf8Value s_depth (depth->ToString());
+            options.depth = svn_depth_from_word(*s_depth);
+        }
+
+        if (options.depth == svn_depth_unknown || options.depth == svn_depth_exclude) {
+            OPTIONS_EXCEPTION("depth can be one of: empty, files, immediates or infinity");
+        }
+    }
+
+    if (opts->Has(this->externals_symbol)) {
+        Local<Value> externals = opts->Get(this->externals_symbol);
+
+        if (!externals->IsBoolean()) {
+           OPTIONS_EXCEPTION("ignore_externals has to be a boolean");
+        }
+
+        options.ignore_externals = externals->BooleanValue();
+    }
 
     return options;
 }
@@ -91,109 +179,30 @@ Handle<Value> SVN::__checkout(const Arguments &args)
     apr_pool_t *subpool = svn_pool_create(svn->pool);
     svn_error_t *err;
 
-    Local<Object> options;
-
     svn_revnum_t result_rev;
     const char *url; //holds link@rev
     const char *tmp_url; //holds only the link to repo
-    const char *path;
+    const char *path = 0;
     svn_opt_revision_t peg_revision;
     svn_opt_revision_t revision;
-    svn_depth_t depth = svn_depth_unknown;
-    svn_boolean_t ignore_externals = false;
-    svn_boolean_t allow_unver_obstructions = false;
 
-    svn_opt_revision_range_t *range = (svn_opt_revision_range_t *) apr_palloc(subpool, sizeof(*range));
-    range->start.kind = svn_opt_revision_unspecified;
-    range->end.kind = svn_opt_revision_unspecified;
-    apr_array_header_t *opt_ranges = apr_array_make(subpool, 1, sizeof(*range));
-    APR_ARRAY_PUSH(opt_ranges, svn_opt_revision_range_t*) = range;
+    options_t options;
+    bool options_err;
+    const char *options_err_msg;
+
+    if (args.Length() == 3) {
+        options = svn->parse_options(args[3], subpool, &options_err, &options_err_msg);
+    }
 
     switch (args.Length()) {
         case 3:
-        {
-            if (!args[2]->IsObject()) {
-                EXCEPTION("options has to be an object");
-            }
-
-            options = args[2]->ToObject();
-
-            if (options->Has(svn->revision_symbol)) {
-                Local<Value> revision = options->Get(svn->revision_symbol);
-
-                if (!revision->IsNumber() || !revision->IsString()) {
-                    EXCEPTION("revision has to be a string or a number");
-                }
-
-                String::Utf8Value jsRevision (revision->ToString());
-
-                if (svn_opt_parse_revision_to_range(opt_ranges, *jsRevision, subpool) != 0) {
-                    EXCEPTION("syntax error in given revision");
-                }
-            }
-
-            if (options->Has(svn->force_symbol)) {
-                Local<Value> force = options->Get(svn->force_symbol);
-
-                if (!force->IsBoolean()) {
-                    EXCEPTION("force has to be a boolean");
-                }
-
-                allow_unver_obstructions = force->BooleanValue();
-            }
-
-            if (options->Has(svn->recursive_symbol)) {
-                Local<Value> recursive = options->Get(svn->recursive_symbol);
-
-                if (!recursive->IsBoolean()) {
-                    EXCEPTION("recursive has to be a boolean");
-                }
-
-                if (recursive->BooleanValue()) {
-                    depth = svn_depth_files;
-                }
-            }
-
-            if (options->Has(svn->depth_symbol)) {
-                Local<Value> o_depth = options->Get(svn->depth_symbol);
-
-                if (!o_depth->IsNumber() || !o_depth->IsString()) {
-                    EXCEPTION("depth has to be a string or a number");
-                }
-
-                //veryfication needed
-                if (o_depth->IsNumber()) {
-                    int i_depth = (int) Local<Integer>::Cast(o_depth)->Int32Value();
-                    depth = static_cast<svn_depth_t>(i_depth);
-                }
-
-                if (o_depth->IsString()) {
-                    String::Utf8Value s_depth (o_depth->ToString());
-                    depth = svn_depth_from_word(*s_depth);
-                }
-
-                if (depth == svn_depth_unknown || depth == svn_depth_exclude) {
-                    EXCEPTION("depth can be one of: empty, files, immediates or infinity");
-                }
-            }
-
-            if (options->Has(svn->externals_symbol)) {
-                Local<Value> externals = options->Get(svn->externals_symbol);
-
-                if (!externals->IsBoolean()) {
-                    EXCEPTION("ignore_externals has to be a boolean");
-                }
-
-                ignore_externals = externals->BooleanValue();
-            }
-        }
         case 2:
         {
             if (!args[1]->IsString()) {
                 EXCEPTION("path has to be a string");
             }
             String::Utf8Value jsPath (args[1]->ToString());
-            path = strdup(*jsPath);
+            path = apr_pstrdup(subpool, *jsPath);
         }
         case 1:
         {
@@ -201,7 +210,7 @@ Handle<Value> SVN::__checkout(const Arguments &args)
                 EXCEPTION("url has to be a string");
             }
             String::Utf8Value jsUrl (args[0]->ToString());
-            url = strdup(*jsUrl);
+            url = apr_pstrdup(subpool, *jsUrl);
 
             if (!svn_path_is_url(url)) {
                 EXCEPTION("given url is not valid");
@@ -216,7 +225,7 @@ Handle<Value> SVN::__checkout(const Arguments &args)
         EXCEPTION("error parsing given url");
     } 
 
-    revision = APR_ARRAY_IDX(opt_ranges, 0, svn_opt_revision_range_t *)->start;
+    revision = options.revision_start;
 
     if (revision.kind == svn_opt_revision_unspecified) {
         if (peg_revision.kind != svn_opt_revision_unspecified) {
@@ -226,20 +235,22 @@ Handle<Value> SVN::__checkout(const Arguments &args)
         }
     }
     //if no target path is specified we creating it (basing on given url)
-    if (strlen(path) == 0) {
+    if (!path) {
         path = svn_uri_basename(tmp_url, subpool);
     }
 
-    if ( (err = svn_client_checkout3(&result_rev, tmp_url, path, &peg_revision, &revision, depth, ignore_externals, allow_unver_obstructions, svn->ctx, subpool)) )
+    if ( (err = svn_client_checkout3(&result_rev, tmp_url, path, &peg_revision, &revision, options.depth, options.ignore_externals, options.force, svn->ctx, subpool)) )
     {
 		svn_pool_destroy(subpool);
 		subpool = NULL;
-		return ThrowException(Exception::Error(
-		    svn->error(err)
-		));
+		return svn->error(err);
     }
 
-    return scope.Close(Integer::New((int)result_rev));
+    Local<Object> obj = Object::New();
+    obj->Set(status_symbol, Integer::New(0));
+    obj->Set(revision_symbol, Integer::New((int) result_rev));
+
+    return scope.Close(obj);
 }
 
 Handle<Value> SVN::__update(const Arguments &args)
@@ -263,23 +274,25 @@ Handle<Value> SVN::__update(const Arguments &args)
     {
 		svn_pool_destroy(subpool);
 		subpool = NULL;
-		return ThrowException(Exception::Error(
-		    svn->error(err)
-		));
+		return svn->error(err);
     }
 
-    return scope.Close(Boolean::New(true));
+    Local<Object> obj = Object::New();
+    obj->Set(status_symbol, Integer::New(0));
+
+    return scope.Close(obj);
 }
 
-svn_error_t* __commit_log(const char **log_msg, const char **tmp_file, const apr_array_header_t *commit_items, void *bato, apr_pool_t *pool)
+svn_error_t* __commit_log(const char **log_msg, const char **tmp_file, const apr_array_header_t *commit_items, void *baton, apr_pool_t *pool)
 {
-    const char *message = "Taki se commit";
-    return svn_utf_cstring_to_utf8(log_msg, message, pool);
+    *log_msg = (const char *) baton;
+    return SVN_NO_ERROR;
+    //return svn_utf_cstring_to_utf8(log_msg, message, pool);
 }
 
 svn_error_t* __commit_callback(const svn_commit_info_t *commit_info, void *baton, apr_pool_t *pool)
 {
-    fprintf(stderr, "%d", (int)commit_info->revision);
+//    fprintf(stderr, "%d", (int)commit_info->revision);
     return SVN_NO_ERROR;
 }
 
@@ -292,21 +305,24 @@ Handle<Value> SVN::__commit(const Arguments &args)
     svn_error_t *err;
 
     String::Utf8Value path (args[0]->ToString());
+    String::Utf8Value msg (args[1]->ToString());
     apr_array_header_t *targets = apr_array_make(subpool, 1, sizeof(const char*));
     *(const char **)apr_array_push(targets) = *path;
 
     svn->ctx->log_msg_func3 = __commit_log;
+    svn->ctx->log_msg_baton3 = *msg;
 
     if ( (err = svn_client_commit5(targets, svn_depth_infinity, 0, 0, 0, NULL, NULL, __commit_callback, NULL, svn->ctx, subpool)) )
     {
 		svn_pool_destroy(subpool);
 		subpool = NULL;
-		return ThrowException(Exception::Error(
-		    svn->error(err)
-		));
+		return svn->error(err);
     }
 
-    return scope.Close(Boolean::New(true));
+    Local<Object> obj = Object::New();
+    obj->Set(status_symbol, Integer::New(0));
+
+    return scope.Close(obj);
 }
 
 Handle<Value> SVN::__cat(const Arguments &args)
@@ -364,9 +380,7 @@ Handle<Value> SVN::do_cat(const Handle<String> url, svn_opt_revision_t revision)
 	{
 		svn_pool_destroy(subpool);
 		subpool = NULL;
-		return ThrowException(Exception::Error(
-			this->error(err)
-		));
+		return this->error(err);
 	}
 	return scope.Close(String::New(buf->data, buf->len));
 }
@@ -427,38 +441,52 @@ void SVN::simple_authentication(const char *username, const char *password)
 				apr_pstrdup(this->pool, password));
 }
 
-Handle<String> SVN::error(svn_error_t *error)
+Handle<Object> SVN::error(svn_error_t *error)
 {
 	HandleScope scope;
 	svn_error_t *err_it = error;
-	Local<String> strerror = String::New("SVN Error Occured: ");
+
+    Local<Object> obj = Object::New();
+    Local<Object> obj_it = obj;
 
 	while( err_it )
 	{
 		char buffer[256];
 		svn_strerror(err_it->apr_err, buffer, sizeof(buffer));
-		strerror = String::Concat(strerror, String::New(" ( "));
-		strerror = String::Concat(strerror, String::New(buffer));
-		strerror = String::Concat(strerror, String::New(" ) "));
+
+        //obj_it->Set(status_symbol, (int) err_it->app_err);
+        obj_it->Set(description_symbol, String::New(buffer));
         if (err_it->message) {
-    		strerror = String::Concat(strerror, String::New(err_it->message));
+            obj_it->Set(message_symbol, String::New(err_it->message));
         }
 
 		err_it = err_it->child;
 		if(err_it != NULL)
 		{
-			strerror = String::Concat(strerror, String::New("\n"));
+            Local<Object> obj_tmp = Object::New();
+            obj_it->Set(error_symbol, obj_tmp);
+            obj_it = obj_tmp;
 		}
 	}
-	return scope.Close(strerror);
+
+	return scope.Close(obj);
 }
 
+//options symbol
 Persistent<FunctionTemplate> SVN::ct;
 Persistent<String> SVN::revision_symbol = NODE_PSYMBOL("revision");
 Persistent<String> SVN::recursive_symbol = NODE_PSYMBOL("recursive");
 Persistent<String> SVN::depth_symbol = NODE_PSYMBOL("depth");
 Persistent<String> SVN::force_symbol = NODE_PSYMBOL("force");
 Persistent<String> SVN::externals_symbol = NODE_PSYMBOL("ignore_externals");
+
+//return object symbols
+Persistent<String> SVN::status_symbol = NODE_PSYMBOL("status");
+
+//errors symbol
+Persistent<String> SVN::description_symbol = NODE_PSYMBOL("description");
+Persistent<String> SVN::message_symbol = NODE_PSYMBOL("message");
+Persistent<String> SVN::error_symbol = NODE_PSYMBOL("error");
 
 extern "C" void init(Handle<Object> target)
 {
