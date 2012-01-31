@@ -48,9 +48,23 @@ typedef struct options_t {
    svn_opt_revision_t revision_start;
    svn_opt_revision_t revision_end;
    svn_depth_t depth;
+   svn_depth_t set_depth;
    svn_boolean_t ignore_externals;
    svn_boolean_t force; //aka allow_unver_obstructions
+   svn_boolean_t parents;
 } options;
+
+enum options_interest {
+    kRevision = 1,
+    kRecursive = 1 << 1,
+    kDepth = 1 << 2,
+    kSetDepth = 1 << 3,
+    kForce = 1 << 4,
+    kIgnoreExternals = 1 << 5,
+    kParents = 1 << 6,
+    kCheckout = kRevision | kRecursive | kDepth | kForce | kIgnoreExternals,
+    kUpdate = kCheckout | kSetDepth | kParents
+};
 
 class SVN : public ObjectWrap
 {
@@ -59,8 +73,10 @@ public:
     static Persistent<String> revision_symbol;
     static Persistent<String> recursive_symbol;
     static Persistent<String> depth_symbol;
+    static Persistent<String> set_depth_symbol;
     static Persistent<String> force_symbol;
     static Persistent<String> externals_symbol;
+    static Persistent<String> parents_symbol;
 
     static Persistent<String> status_symbol;
 
@@ -115,7 +131,8 @@ protected:
 	// Inceptors
     
     // Helpers
-    options_t parse_options(const Handle<Value> opt_arg, apr_pool_t *pool, bool *has_err, const char **err_msg);
+    options_t default_options();
+    options_t parse_options(const Handle<Value> opt_arg, options_interest opt_intrst, apr_pool_t *pool, bool *has_err, const char **err_msg);
 private:
 	apr_pool_t *pool;
 	svn_client_ctx_t *ctx;
