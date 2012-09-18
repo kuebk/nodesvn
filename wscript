@@ -7,7 +7,7 @@ def configure(conf):
 
 
 def build(bld):
-#  bld.exec_command("mkdir -p subversion && cd ../deps/subversion && ./configure --with-pic --disable-shared --without-shared --enable-debug --prefix=%s && make clean install" % (bld.bdir + "/subversion"))
+  bld.exec_command("mkdir -p subversion && cd ../deps/subversion && ./configure --with-pic --disable-shared --without-shared --enable-debug --prefix=%s && make clean install" % (bld.bdir + "/subversion"))
   obj = bld.new_task_gen("cxx", "shlib", "node_addon")
   obj.cxxflags = ["-g", "-D_FILE_OFFSET_BITS=64", "-D_LARGEFILE_SOURCE", "-Wall"]
   obj.target = "nodesvn"
