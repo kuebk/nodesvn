@@ -66,14 +66,30 @@ void SVN::InitModule(Handle<Object> target)
 	NODE_SET_PROTOTYPE_METHOD(ct, "commit", __commit);
 
     //enum svn_depth_t
-    NODE_DEFINE_CONSTANT(target, svn_depth_unknown);
-    NODE_DEFINE_CONSTANT(target, svn_depth_exclude);
-    NODE_DEFINE_CONSTANT(target, svn_depth_empty);
-    NODE_DEFINE_CONSTANT(target, svn_depth_files);
-    NODE_DEFINE_CONSTANT(target, svn_depth_immediates);
-    NODE_DEFINE_CONSTANT(target, svn_depth_infinity);
+    Local<Object> depth = Object::New();
+    NODE_DEFINE_CONSTANT(depth, svn_depth_unknown);
+    NODE_DEFINE_CONSTANT(depth, svn_depth_exclude);
+    NODE_DEFINE_CONSTANT(depth, svn_depth_empty);
+    NODE_DEFINE_CONSTANT(depth, svn_depth_files);
+    NODE_DEFINE_CONSTANT(depth, svn_depth_immediates);
+    NODE_DEFINE_CONSTANT(depth, svn_depth_infinity);
+
+
+    //enum svn_wc_notify_state_t
+    Local<Object> state = Object::New();
+    NODE_DEFINE_CONSTANT(state, svn_wc_notify_state_inapplicable);
+    NODE_DEFINE_CONSTANT(state, svn_wc_notify_state_unknown);
+    NODE_DEFINE_CONSTANT(state, svn_wc_notify_state_unchanged);
+    NODE_DEFINE_CONSTANT(state, svn_wc_notify_state_missing);
+    NODE_DEFINE_CONSTANT(state, svn_wc_notify_state_obstructed);
+    NODE_DEFINE_CONSTANT(state, svn_wc_notify_state_changed);
+    NODE_DEFINE_CONSTANT(state, svn_wc_notify_state_merged);
+    NODE_DEFINE_CONSTANT(state, svn_wc_notify_state_conflicted);
+    NODE_DEFINE_CONSTANT(state, svn_wc_notify_state_source_missing);
 
 	target->Set(String::NewSymbol("client"), ct->GetFunction());
+    target->Set(String::NewSymbol("depth"), depth);
+    target->Set(String::NewSymbol("state"), state);
 }
 
 Handle<Value> SVN::New(const Arguments &args)
@@ -118,7 +134,7 @@ options_t SVN::parse_options(const Handle<Value> opt_arg, options_interest opt_i
     if (opt_intrst & kRevision && opts->Has(this->revision_symbol)) {
         Local<Value> revision = opts->Get(this->revision_symbol);
 
-        if (!revision->IsNumber() || !revision->IsString()) {
+        if (!revision->IsNumber() && !revision->IsString()) {
             OPTIONS_EXCEPTION("revision has to be a string or a number");
         }
 
@@ -231,7 +247,7 @@ Handle<Value> SVN::__checkout(const Arguments &args)
     Local<Object> result;
 
     if (args.Length() == 3) {
-        options = svn->parse_options(args[3], kCheckout, subpool, &options_err, &options_err_msg);
+        options = svn->parse_options(args[2], kCheckout, subpool, &options_err, &options_err_msg);
     } else {
         options = svn->default_options();
     }
@@ -296,6 +312,27 @@ Handle<Value> SVN::__checkout(const Arguments &args)
     return scope.Close(result);
 }
 
+void __notify_callback(void *baton, const svn_wc_notify_t *notify, apr_pool_t *pool)
+{
+    notify_item *item = (notify_item *) malloc(sizeof(notify_item));
+    item->path = notify->path;
+    item->action = notify->content_state;
+    item->next = NULL;
+
+    notify_list *list = (notify_list *) baton;
+
+    if (!list->first && !list->last) {
+        list->first = item;
+    } else {
+        list->last->next = item;
+    }
+
+//    fprintf(stderr, "%s\n", item->path);
+//    fprintf(stderr, "%d\n", item->action);
+
+    list->last = item;
+}
+
 Handle<Value> SVN::__update(const Arguments &args)
 {
     HandleScope scope;
@@ -318,7 +355,7 @@ Handle<Value> SVN::__update(const Arguments &args)
     Local<Object> result;
 
     if (args.Length() == 2) {
-        options = svn->parse_options(args[2], kUpdate, subpool, &options_err, &options_err_msg);
+        options = svn->parse_options(args[1], kUpdate, subpool, &options_err, &options_err_msg);
     } else {
         options = svn->default_options();
     }
@@ -344,16 +381,44 @@ Handle<Value> SVN::__update(const Arguments &args)
         depth_is_sticky = false;
     }
 
+    notify_list *list = (notify_list *) malloc(sizeof(notify_list));
+    memset(list, 0, sizeof(notify_list));
+
+    svn->ctx->notify_func2 = __notify_callback;
+    svn->ctx->notify_baton2 = list;
+
     if ( (err = svn_client_update4(&result_revs, targets, &(options.revision_start), depth, depth_is_sticky, options.ignore_externals, options.force, true, options.parents, svn->ctx, subpool)) )
     {
-		result = Local<Object>::New( svn->error(err));
+		result = Local<Object>::New(svn->error(err));
     } else {
         result = Object::New();
         result->Set(status_symbol, Integer::New(0));
+        Local<Object> data = Object::New();
+
+        notify_item *item = list->first;
+
+        while (item) {
+            Local<Array> arr;
+            Local<String> key = String::New(item->path);
+
+            if (!data->Has(key)) {
+                arr = Array::New();
+                data->Set(key, arr);
+            } else {
+                arr = data->Get(key).As<Array>();
+            }
+
+            arr->Set(arr->Length(), Integer::New(item->action));
+
+            item = item->next;
+        }
+
+        result->Set(data_symbol, data);
     }
 
     return scope.Close(result);
 }
+
 
 svn_error_t* __commit_log(const char **log_msg, const char **tmp_file, const apr_array_header_t *commit_items, void *baton, apr_pool_t *pool)
 {
@@ -556,6 +621,7 @@ Persistent<String> SVN::parents_symbol = NODE_PSYMBOL("parents");
 
 //return object symbols
 Persistent<String> SVN::status_symbol = NODE_PSYMBOL("status");
+Persistent<String> SVN::data_symbol = NODE_PSYMBOL("data");
 
 //errors symbol
 Persistent<String> SVN::description_symbol = NODE_PSYMBOL("description");

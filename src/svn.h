@@ -52,7 +52,19 @@ typedef struct options_t {
    svn_boolean_t ignore_externals;
    svn_boolean_t force; //aka allow_unver_obstructions
    svn_boolean_t parents;
-} options;
+} options_t;
+
+typedef struct notify_item {
+    const char *path;
+    svn_wc_notify_state_t action;
+    notify_item *next;
+
+} notify_item;
+
+typedef struct notify_list {
+    notify_item *first;
+    notify_item *last;
+} notify_list;
 
 enum options_interest {
     kRevision = 1,
@@ -79,6 +91,7 @@ public:
     static Persistent<String> parents_symbol;
 
     static Persistent<String> status_symbol;
+    static Persistent<String> data_symbol;
 
     static Persistent<String> description_symbol;
     static Persistent<String> message_symbol;
