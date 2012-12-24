@@ -43,6 +43,21 @@
 using namespace node;
 using namespace v8;
 
+#define EXCEPTION(message) \
+    return ThrowException(Exception::Error(String::New(message)))
+
+#define ERROR(message) \
+    result = Object::New(); \
+    result->Set(status_symbol, Integer::New(0)); \
+    result->Set(message_symbol, String::New(message)); \
+    svn_pool_destroy(subpool); \
+    subpool = NULL; \
+    return result;
+
+#define OPTIONS_EXCEPTION(message) \
+    *has_err = true; \
+    *err_msg = message; \
+    return options; 
 
 typedef struct options_t {
    svn_opt_revision_t revision_start;
@@ -131,6 +146,7 @@ protected:
 	static Handle<Value> __revert(const Arguments &args);
 	static Handle<Value> __status(const Arguments &args);
 	static Handle<Value> __update(const Arguments &args);
+    static Handle<Value> __upgrade(const Arguments &args);
 
 	Handle<Value> do_cat(const Handle<String> url, svn_opt_revision_t revision);
 

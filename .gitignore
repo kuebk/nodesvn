@@ -1,0 +1,4 @@
+.lock-wscript
+.sw*
+build/
+deps/
