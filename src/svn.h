@@ -50,9 +50,12 @@ using namespace v8;
     result = Object::New(); \
     result->Set(status_symbol, Integer::New(0)); \
     result->Set(message_symbol, String::New(message)); \
-    svn_pool_destroy(subpool); \
-    subpool = NULL; \
+    POOL_DESTROY \
     return result;
+
+#define POOL_DESTROY \
+    svn_pool_destroy(subpool); \
+    subpool = NULL;
 
 #define OPTIONS_EXCEPTION(message) \
     *has_err = true; \
@@ -68,18 +71,6 @@ typedef struct options_t {
    svn_boolean_t force; //aka allow_unver_obstructions
    svn_boolean_t parents;
 } options_t;
-
-typedef struct notify_item {
-    const char *path;
-    svn_wc_notify_state_t action;
-    notify_item *next;
-
-} notify_item;
-
-typedef struct notify_list {
-    notify_item *first;
-    notify_item *last;
-} notify_list;
 
 enum options_interest {
     kRevision = 1,

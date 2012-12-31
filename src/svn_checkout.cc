@@ -1,8 +1,8 @@
 #include "svn.h"
 
-Handle<Value> SVN::__checkout(const Arguments &args)
+Handle<Value> SVN::__checkout (const Arguments &args)
 {
-	HandleScope scope;
+    HandleScope scope;
 
     //system
     SVN *svn = ObjectWrap::Unwrap<SVN>(args.This());
@@ -31,16 +31,14 @@ Handle<Value> SVN::__checkout(const Arguments &args)
 
     switch (args.Length()) {
         case 3:
-        case 2:
-        {
+        case 2: {
             if (!args[1]->IsString()) {
                 ERROR("path has to be a string");
             }
             String::Utf8Value jsPath (args[1]->ToString());
             path = apr_pstrdup(subpool, *jsPath);
         }
-        case 1:
-        {
+        case 1: {
             if (!args[0]->IsString()) {
                 ERROR("url has to be a string");
             }
@@ -74,17 +72,15 @@ Handle<Value> SVN::__checkout(const Arguments &args)
         path = svn_uri_basename(tmp_url, subpool);
     }
 
-    if ( (err = svn_client_checkout3(&result_rev, tmp_url, path, &peg_revision, &revision, options.depth, options.ignore_externals, options.force, svn->ctx, subpool)) )
-    {
-		result = Local<Object>::New(svn->error(err));
+    if ( (err = svn_client_checkout3(&result_rev, tmp_url, path, &peg_revision, &revision, options.depth, options.ignore_externals, options.force, svn->ctx, subpool)) ) {
+        result = Local<Object>::New(svn->error(err));
     } else {
         result = Object::New();
         result->Set(status_symbol, Integer::New(0));
         result->Set(revision_symbol, Integer::New((int) result_rev));
     }
-		
-    svn_pool_destroy(subpool);
-	subpool = NULL;
+
+    POOL_DESTROY
 
     return scope.Close(result);
 }

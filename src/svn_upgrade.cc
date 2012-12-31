@@ -21,15 +21,14 @@ Handle<Value> SVN::__upgrade (const Arguments &args) {
     String::Utf8Value jsPath (args[0]->ToString());
     path = apr_pstrdup(subpool, *jsPath);
 
-    if ((err = svn_client_upgrade(path, svn->ctx, subpool))) {
-		result = Local<Object>::New(svn->error(err));
+    if ( (err = svn_client_upgrade(path, svn->ctx, subpool)) ) {
+        result = Local<Object>::New(svn->error(err));
     } else {
         result = Object::New();
         result->Set(status_symbol, Integer::New(0));
     }
-		
-    svn_pool_destroy(subpool);
-	subpool = NULL;
+
+    POOL_DESTROY
 
     return scope.Close(result);
 }

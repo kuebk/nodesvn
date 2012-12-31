@@ -1,11 +1,10 @@
 #include "svn.h"
+#include "svn_update.h"
 
-void __notify_callback(void *baton, const svn_wc_notify_t *notify, apr_pool_t *pool)
-{
-    notify_item *item = (notify_item *) malloc(sizeof(notify_item));
+void __notify_callback (void *baton, const svn_wc_notify_t *notify, apr_pool_t *pool) {
+    notify_item *item = __notify_alloc_item();
     item->path = notify->path;
     item->action = notify->content_state;
-    item->next = NULL;
 
     notify_list *list = (notify_list *) baton;
 
@@ -15,14 +14,41 @@ void __notify_callback(void *baton, const svn_wc_notify_t *notify, apr_pool_t *p
         list->last->next = item;
     }
 
-//    fprintf(stderr, "%s\n", item->path);
-//    fprintf(stderr, "%d\n", item->action);
-
     list->last = item;
 }
 
-Handle<Value> SVN::__update(const Arguments &args)
-{
+void __notify_free_list (notify_list *list) {
+    notify_item *item, *next;
+
+    item = list->first;
+
+    while (item) {
+        next = item->next;
+        free(item);
+        item = next;
+    }
+
+    free(list);
+    list = NULL;
+}
+
+notify_item *__notify_alloc_item () {
+    size_t size = sizeof(notify_item);
+    notify_item *item = (notify_item *) malloc(size);
+    memset(item, NULL, size);
+
+    return item;
+}
+
+notify_list *__notify_alloc_list () {
+    size_t size = sizeof(notify_list);
+    notify_list *list = (notify_list *) malloc(size);
+    memset(list, NULL, size);
+
+    return list;
+}
+
+Handle<Value> SVN::__update(const Arguments &args) {
     HandleScope scope;
 
     //system
@@ -69,15 +95,13 @@ Handle<Value> SVN::__update(const Arguments &args)
         depth_is_sticky = false;
     }
 
-    notify_list *list = (notify_list *) malloc(sizeof(notify_list));
-    memset(list, 0, sizeof(notify_list));
+    notify_list *list = __notify_alloc_list();
 
     svn->ctx->notify_func2 = __notify_callback;
     svn->ctx->notify_baton2 = list;
 
-    if ( (err = svn_client_update4(&result_revs, targets, &(options.revision_start), depth, depth_is_sticky, options.ignore_externals, options.force, true, options.parents, svn->ctx, subpool)) )
-    {
-		result = Local<Object>::New(svn->error(err));
+    if ( (err = svn_client_update4(&result_revs, targets, &(options.revision_start), depth, depth_is_sticky, options.ignore_externals, options.force, true, options.parents, svn->ctx, subpool)) ) {
+        result = Local<Object>::New(svn->error(err));
     } else {
         result = Object::New();
         result->Set(status_symbol, Integer::New(0));
@@ -100,9 +124,12 @@ Handle<Value> SVN::__update(const Arguments &args)
 
             item = item->next;
         }
-
         result->Set(data_symbol, data);
+
+        __notify_free_list(list);
     }
+
+    POOL_DESTROY
 
     return scope.Close(result);
 }
