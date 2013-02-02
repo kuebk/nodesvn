@@ -44,23 +44,23 @@ using namespace node;
 using namespace v8;
 
 #define EXCEPTION(message) \
-    return ThrowException(Exception::Error(String::New(message)))
+	return ThrowException(Exception::Error(String::New(message)))
 
 #define ERROR(message) \
-    result = Object::New(); \
-    result->Set(status_symbol, Integer::New(0)); \
-    result->Set(message_symbol, String::New(message)); \
-    POOL_DESTROY \
-    return result;
+	result = Object::New(); \
+	result->Set(status_symbol, Integer::New(0)); \
+	result->Set(message_symbol, String::New(message)); \
+	POOL_DESTROY \
+	return result;
 
 #define POOL_DESTROY \
-    svn_pool_destroy(subpool); \
-    subpool = NULL;
+	svn_pool_destroy(subpool); \
+	subpool = NULL;
 
 #define OPTIONS_EXCEPTION(message) \
-    *has_err = true; \
-    *err_msg = message; \
-    return options; 
+	*has_err = true; \
+	*err_msg = message; \
+	return options; 
 
 typedef struct options_t {
    svn_opt_revision_t revision_start;
@@ -73,35 +73,35 @@ typedef struct options_t {
 } options_t;
 
 enum options_interest {
-    kRevision = 1,
-    kRecursive = 1 << 1,
-    kDepth = 1 << 2,
-    kSetDepth = 1 << 3,
-    kForce = 1 << 4,
-    kIgnoreExternals = 1 << 5,
-    kParents = 1 << 6,
-    kCheckout = kRevision | kRecursive | kDepth | kForce | kIgnoreExternals,
-    kUpdate = kCheckout | kSetDepth | kParents
+	kRevision = 1,
+	kRecursive = 1 << 1,
+	kDepth = 1 << 2,
+	kSetDepth = 1 << 3,
+	kForce = 1 << 4,
+	kIgnoreExternals = 1 << 5,
+	kParents = 1 << 6,
+	kCheckout = kRevision | kRecursive | kDepth | kForce | kIgnoreExternals,
+	kUpdate = kCheckout | kSetDepth | kParents
 };
 
 class SVN : public ObjectWrap
 {
 public:
 	static Persistent<FunctionTemplate> ct;
-    static Persistent<String> revision_symbol;
-    static Persistent<String> recursive_symbol;
-    static Persistent<String> depth_symbol;
-    static Persistent<String> set_depth_symbol;
-    static Persistent<String> force_symbol;
-    static Persistent<String> externals_symbol;
-    static Persistent<String> parents_symbol;
+	static Persistent<String> revision_symbol;
+	static Persistent<String> recursive_symbol;
+	static Persistent<String> depth_symbol;
+	static Persistent<String> set_depth_symbol;
+	static Persistent<String> force_symbol;
+	static Persistent<String> externals_symbol;
+	static Persistent<String> parents_symbol;
 
-    static Persistent<String> status_symbol;
-    static Persistent<String> data_symbol;
+	static Persistent<String> status_symbol;
+	static Persistent<String> data_symbol;
 
-    static Persistent<String> description_symbol;
-    static Persistent<String> message_symbol;
-    static Persistent<String> error_symbol;
+	static Persistent<String> description_symbol;
+	static Persistent<String> message_symbol;
+	static Persistent<String> error_symbol;
 
 	SVN(const char *config);
 	static void InitModule(Handle<Object> target); // V8/Node initializer
@@ -137,7 +137,7 @@ protected:
 	static Handle<Value> __revert(const Arguments &args);
 	static Handle<Value> __status(const Arguments &args);
 	static Handle<Value> __update(const Arguments &args);
-    static Handle<Value> __upgrade(const Arguments &args);
+	static Handle<Value> __upgrade(const Arguments &args);
 
 	Handle<Value> do_cat(const Handle<String> url, svn_opt_revision_t revision);
 
@@ -149,10 +149,10 @@ protected:
 	// Accessors
 
 	// Inceptors
-    
-    // Helpers
-    options_t default_options();
-    options_t parse_options(const Handle<Value> opt_arg, options_interest opt_intrst, apr_pool_t *pool, bool *has_err, const char **err_msg);
+	
+	// Helpers
+	options_t default_options();
+	options_t parse_options(const Handle<Value> opt_arg, options_interest opt_intrst, apr_pool_t *pool, bool *has_err, const char **err_msg);
 private:
 	apr_pool_t *pool;
 	svn_client_ctx_t *ctx;
