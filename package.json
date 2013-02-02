@@ -1,5 +1,4 @@
 {
-    "version": "0.2.2",
-    "name": "kubek-nodesvn",
+    "name": "nodesvn",
     "main": "./build/default/nodesvn.node"
 }
