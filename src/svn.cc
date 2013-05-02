@@ -140,9 +140,11 @@ Persistent<String> SVN::description_symbol = NODE_PSYMBOL("description");
 Persistent<String> SVN::message_symbol = NODE_PSYMBOL("message");
 Persistent<String> SVN::error_symbol = NODE_PSYMBOL("error");
 
-extern "C" void init(Handle<Object> target)
+/*extern "C" void init(Handle<Object> target)
 {
     HandleScope scope;
 
     SVN::InitModule(target);
-}
+}*/
+
+NODE_MODULE(nodesvn, SVN::InitModule)

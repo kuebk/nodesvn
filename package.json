@@ -1,5 +1,15 @@
 {
-    "version": "0.2.2",
+    "version": "0.3.0",
     "name": "kubek-nodesvn",
-    "main": "./build/default/nodesvn.node"
+    "main": "bin/nodesvn.js",
+    "author": {
+        "name": "Daniel Enman",
+        "email": "enmand@gmail.com"
+    },
+    "contributors": [
+        "Jakub Lekstan <kuebzky@gmail.com>"
+    ],
+    "engines": {
+        "node": ">= 0.10.0"
+    }
 }
