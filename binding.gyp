@@ -6,7 +6,7 @@
     "targets": [
         {
             "target_name": "nodesvn",
-            "dependencies": ["libsvn"],
+            "dependencies": ["libs"],
             "sources": [
                 "src/svn.cc",
                 "src/svn_cat.cc",
@@ -47,24 +47,13 @@
             ]
         },
         {
-            "target_name": "libsvn",
-            "type": "none",
-            "dependencies": ["libneon"],
-            "actions": [{
-                "action_name": "build_libsvn",
-                "inputs": [""],
-                "outputs": [""],
-                "action": ["sh", "build_libsvn.sh"]
-            }]
-        },
-        {
-            "target_name": "libneon",
+            "target_name": "libs",
             "type": "none",
             "actions": [{
-                "action_name": "build_libneon",
+                "action_name": "build_lib",
                 "inputs": [""],
                 "outputs": [""],
-                "action": ["sh", "build_libneon.sh"]
+                "action": ["sh", "build.sh"]
             }]
         }
     ]
