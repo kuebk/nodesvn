@@ -43,7 +43,8 @@
                 "<(svn_lib)/libapr-1.a",
                 "-lexpat",
                 "<(neon_lib)/libneon.a",
-                "-luuid"
+                "-luuid",
+                "-lz"
             ]
         },
         {
