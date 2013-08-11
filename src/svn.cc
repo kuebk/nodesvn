@@ -43,6 +43,7 @@ void SVN::InitModule(Handle<Object> target)
     ct->InstanceTemplate()->SetInternalFieldCount(1);
     ct->SetClassName(String::NewSymbol("client"));
 
+    NODE_SET_PROTOTYPE_METHOD(ct, "add", __add);
     NODE_SET_PROTOTYPE_METHOD(ct, "authenticate", __authenticate);
     NODE_SET_PROTOTYPE_METHOD(ct, "cat", __cat);
     NODE_SET_PROTOTYPE_METHOD(ct, "checkout", __checkout);

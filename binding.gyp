@@ -10,6 +10,7 @@
             "sources": [
                 "src/svn.cc",
                 "src/svn_cat.cc",
+                "src/svn_add.cc",
                 "src/svn_auth.cc",
                 "src/svn_checkout.cc",
                 "src/svn_commit.cc",
