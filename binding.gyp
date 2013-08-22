@@ -45,7 +45,8 @@
                 "-lexpat",
                 "<(neon_lib)/libneon.a",
                 "-luuid",
-                "-lz"
+                "-lz",
+                "-lmagic"
             ]
         },
         {
