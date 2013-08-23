@@ -1,5 +1,5 @@
 {
-    "version": "0.3.0",
+    "version": "0.3.1",
     "name": "kubek-nodesvn",
     "main": "bin/nodesvn.js",
     "author": {
@@ -7,9 +7,10 @@
         "email": "enmand@gmail.com"
     },
     "contributors": [
-        "Jakub Lekstan <kuebzky@gmail.com>"
+        "Jakub Lekstan <kuebzky@gmail.com>",
+        "Albert Łącki <albert.lacki@gmail.com>"
     ],
     "engines": {
-        "node": ">= 0.10.0"
+        "node": ">= 0.8.0"
     }
 }
